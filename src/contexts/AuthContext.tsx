@@ -56,8 +56,10 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return false
     return window.localStorage.getItem(STORAGE_KEY) === 'true'
   })
+  const [tick, setTick] = useState(0)
 
   const value = useMemo<AuthContextValue>(() => {
+    void tick
     const currentUser = getCurrentUser() ?? null
     const session: AppSession = isLoggedIn && currentUser ? { user: { id: currentUser.id } } : null
     const profile = isLoggedIn ? currentUser : null
@@ -76,9 +78,11 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
         window.localStorage.removeItem(STORAGE_KEY)
         setIsLoggedIn(false)
       },
-      refreshProfile: async () => {},
+      refreshProfile: async () => {
+        setTick(n => n + 1)
+      },
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, tick])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
