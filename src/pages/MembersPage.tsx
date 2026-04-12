@@ -54,7 +54,7 @@ export default function MembersPage() {
     return list.sort((a, b) => {
       const diff = getMemberTagCount(b.id) - getMemberTagCount(a.id)
       if (diff !== 0) return diff
-      return a.join_year - b.join_year
+      return (a.join_year ?? 9999) - (b.join_year ?? 9999)
     })
   }, [filters])
 
