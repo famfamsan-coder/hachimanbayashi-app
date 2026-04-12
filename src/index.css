@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans JP", system-ui, sans-serif;
+
+  --color-primary: #8B4513;
+  --color-primary-light: #D2691E;
+  --color-secondary: #2F4F4F;
+  --color-bg: #FFF8F0;
+  --color-ink: #333333;
+  --color-ink-muted: #666666;
+
+  --color-badge-blue: #3B82F6;
+  --color-badge-yellow: #EAB308;
+  --color-badge-green: #22C55E;
+  --color-badge-red: #EF4444;
+
+  --color-status-attend: #22C55E;
+  --color-status-absent: #EF4444;
+  --color-status-pending: #F59E0B;
+  --color-status-noreply: #9CA3AF;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+.badge-rainbow {
+  background: linear-gradient(90deg, #FF0000, #FF8000, #FFFF00, #00FF00, #0080FF, #8000FF);
+  color: #fff;
+}
+
+.print-only { display: none; }
+
+@media print {
+  @page { size: A4 landscape; margin: 15mm; }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    font-size: 11pt;
+  }
+
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-table th,
+  .print-table td {
+    border: 1px solid #333;
+    padding: 6px 8px;
+    font-size: 10pt;
+  }
+  .print-table thead th {
+    background: #f3f4f6 !important;
+  }
+}
