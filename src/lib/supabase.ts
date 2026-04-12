@@ -1,18 +1,19 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { IS_MOCK_MODE, SUPABASE_URL, SUPABASE_ANON_KEY } from './config'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const supabase: SupabaseClient | null = IS_MOCK_MODE
+  ? null
+  : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
 
-if (!url || !anonKey) {
-  throw new Error(
-    'Supabase 環境変数が未設定です。.env.local に VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY を設定してください。',
-  )
+export function requireSupabase(): SupabaseClient {
+  if (!supabase) {
+    throw new Error('Supabase client is not available (mock mode)')
+  }
+  return supabase
 }
-
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-})

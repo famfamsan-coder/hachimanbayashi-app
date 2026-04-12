@@ -386,10 +386,11 @@ insert into public.songs (id, name, reading, sort_order) values
   ('shouden',  '昇殿',       'しょうでん',   6);
 
 insert into public.instruments (id, name, alias, player_count, sort_order) values
-  ('ookan',  '大太鼓', 'オオカン', 1, 1),
-  ('tsuke',  '小太鼓', 'ツケ',     2, 2),
-  ('yosuke', '鉦',     'ヨスケ',   1, 3),
-  ('tonbi',  '笛',     'トンビ',   1, 4);
+  ('ookan',  '大太鼓', 'おおかん', 1, 1),
+  ('tsuke',  '小太鼓', 'つけ',     2, 2),
+  ('karami', '小太鼓', 'からみ',   1, 3),
+  ('kane',   '鉦',     'かね',     1, 4),
+  ('fue',    '笛',     'ふえ',     1, 5);
 
 insert into public.dances (id, name, sort_order) values
   ('hyottoko',  'ひょっとこ', 1),
@@ -410,8 +411,8 @@ insert into public.song_dances (song_id, dance_id) values
   ('shouden',  'shishimai');
 
 insert into public.badge_thresholds (grade_name, color, min_tags, max_tags, sort_order) values
-  ('入門',   'blue',    1,  6,  1),
-  ('修行中', 'yellow',  7,  13, 2),
-  ('一人前', 'green',   14, 20, 3),
-  ('達人',   'red',     21, 28, 4),
-  ('名人',   'rainbow', 29, 32, 5);
+  ('入門',   'blue',    1,  7,  1),
+  ('修行中', 'yellow',  8,  15, 2),
+  ('一人前', 'green',   16, 23, 3),
+  ('達人',   'red',     24, 33, 4),
+  ('名人',   'rainbow', 34, 37, 5);

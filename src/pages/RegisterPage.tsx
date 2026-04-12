@@ -5,6 +5,8 @@ import {
   MOCK_REGISTRATION_REQUESTS,
   type RegistrationRequest,
 } from '@/lib/mockData'
+import { IS_MOCK_MODE } from '@/lib/config'
+import { supabase } from '@/lib/supabase'
 
 type FormState = {
   display_name: string
@@ -56,21 +58,40 @@ export default function RegisterPage() {
     if (Object.keys(eObj).length > 0) return
 
     setSubmitting(true)
-    await new Promise(r => setTimeout(r, 500))
 
-    const newRequest: RegistrationRequest = {
-      id: `reg-${Date.now()}`,
+    const payload = {
       display_name: form.display_name.trim(),
       furigana: form.furigana.trim(),
       email: form.email.trim(),
       join_year: form.join_year ? Number(form.join_year) : null,
       message: form.message.trim() || null,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      reviewed_at: null,
-      reviewed_by: null,
     }
-    MOCK_REGISTRATION_REQUESTS.unshift(newRequest)
+
+    if (IS_MOCK_MODE || !supabase) {
+      await new Promise(r => setTimeout(r, 500))
+      const newRequest: RegistrationRequest = {
+        id: `reg-${Date.now()}`,
+        ...payload,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        reviewed_at: null,
+        reviewed_by: null,
+      }
+      MOCK_REGISTRATION_REQUESTS.unshift(newRequest)
+    } else {
+      const { data, error } = await supabase
+        .from('registration_requests')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) {
+        setSubmitting(false)
+        setErrors({ email: `送信に失敗しました: ${error.message}` })
+        return
+      }
+      if (data) MOCK_REGISTRATION_REQUESTS.unshift(data as RegistrationRequest)
+    }
+
     setSubmitting(false)
     setDone(true)
   }
