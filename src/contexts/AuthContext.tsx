@@ -26,6 +26,7 @@ type AuthContextValue = {
   session: AppSession
   profile: Profile | null
   loading: boolean
+  error: string | null
   isAdmin: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -68,6 +69,7 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading: false,
+      error: null,
       isAdmin: !!profile && profile.role === 'admin',
       signIn: async () => {
         window.localStorage.setItem(STORAGE_KEY, 'true')
@@ -91,54 +93,104 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
 // Supabase
 // ============================================================
 
+type FetchResult = { profile: Profile | null; error: string | null }
+
 function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const mounted = useRef(true)
 
-  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
-    if (!supabase) return null
-    const { data, error } = await supabase
+  const fetchProfile = useCallback(async (userId: string): Promise<FetchResult> => {
+    if (!supabase) return { profile: null, error: 'Supabase client が初期化されていません' }
+    const { data, error: dbError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle()
-    if (error) {
-      console.error('プロフィール取得エラー:', error.message)
-      return null
+    if (dbError) {
+      console.error('[auth] プロフィール取得エラー:', dbError)
+      return {
+        profile: null,
+        error: `プロフィール取得に失敗しました (${dbError.code ?? 'unknown'}): ${dbError.message}`,
+      }
     }
-    return (data as Profile | null) ?? null
+    return { profile: (data as Profile | null) ?? null, error: null }
   }, [])
+
+  const ensureProfile = useCallback(
+    async (user: { id: string; email?: string | null }): Promise<FetchResult> => {
+      const first = await fetchProfile(user.id)
+      if (first.error || first.profile) return first
+
+      // 行が存在しない → デフォルトプロフィールを自動作成
+      if (!supabase) return { profile: null, error: 'Supabase client が初期化されていません' }
+      const defaultName = (user.email ?? '').split('@')[0] || 'メンバー'
+      console.warn('[auth] profiles に該当行がないため自動作成します:', { id: user.id, defaultName })
+
+      const { data, error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: user.id, display_name: defaultName, role: 'member' })
+        .select('*')
+        .maybeSingle()
+
+      if (insertError) {
+        console.error('[auth] プロフィール自動作成エラー:', insertError)
+        const hint =
+          insertError.code === '42501' || /row-level security/i.test(insertError.message)
+            ? '（RLS で INSERT がブロックされている可能性があります。migration 004 を適用してください）'
+            : ''
+        return {
+          profile: null,
+          error: `プロフィール自動作成に失敗しました: ${insertError.message}${hint}`,
+        }
+      }
+      return { profile: (data as Profile | null) ?? null, error: null }
+    },
+    [fetchProfile],
+  )
 
   const refreshProfile = useCallback(async () => {
     if (!session?.user) {
       setProfile(null)
+      setError(null)
       return
     }
-    const p = await fetchProfile(session.user.id)
-    if (mounted.current) setProfile(p)
-  }, [session, fetchProfile])
+    const res = await ensureProfile({ id: session.user.id, email: session.user.email })
+    if (!mounted.current) return
+    setProfile(res.profile)
+    setError(res.error)
+  }, [session, ensureProfile])
 
   // 初期セッション取得 + 変更購読
   useEffect(() => {
     mounted.current = true
     if (!supabase) {
       setLoading(false)
+      setError('Supabase client が初期化されていません')
       return
     }
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted.current) return
-      setSession(data.session)
-      if (!data.session) {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted.current) return
+        setSession(data.session)
+        if (!data.session) setLoading(false)
+      })
+      .catch(err => {
+        console.error('[auth] getSession エラー:', err)
+        if (!mounted.current) return
+        setError(`セッション取得に失敗しました: ${err?.message ?? err}`)
         setLoading(false)
-      }
-    })
+      })
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted.current) return
       setSession(newSession)
       if (!newSession) {
         setProfile(null)
+        setError(null)
         setLoading(false)
       }
     })
@@ -148,30 +200,43 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // セッションが変化したらプロフィール取得
+  // セッションが変化したらプロフィール取得（必要なら自動作成）
   useEffect(() => {
     if (!session?.user) {
       setProfile(null)
+      setError(null)
       return
     }
     setLoading(true)
-    fetchProfile(session.user.id).then(p => {
-      if (!mounted.current) return
-      setProfile(p)
-      setLoading(false)
-    })
-  }, [session, fetchProfile])
+    setError(null)
+    ensureProfile({ id: session.user.id, email: session.user.email })
+      .then(res => {
+        if (!mounted.current) return
+        setProfile(res.profile)
+        setError(res.error)
+      })
+      .catch(err => {
+        console.error('[auth] ensureProfile 例外:', err)
+        if (!mounted.current) return
+        setProfile(null)
+        setError(`プロフィール取得中に予期せぬエラー: ${err?.message ?? err}`)
+      })
+      .finally(() => {
+        if (mounted.current) setLoading(false)
+      })
+  }, [session, ensureProfile])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session: session?.user ? { user: { id: session.user.id } } : null,
       profile,
       loading,
+      error,
       isAdmin: !!profile && profile.role === 'admin',
       signIn: async (email: string, password: string) => {
         if (!supabase) return { error: 'Supabase client 未初期化' }
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        return { error: error?.message ?? null }
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        return { error: signInError?.message ?? null }
       },
       signOut: async () => {
         if (!supabase) return
@@ -179,7 +244,7 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       },
       refreshProfile,
     }),
-    [session, profile, loading, refreshProfile],
+    [session, profile, loading, error, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

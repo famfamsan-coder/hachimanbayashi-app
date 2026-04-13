@@ -43,8 +43,14 @@ function replace<T>(arr: T[], next: T[]) {
   arr.splice(0, arr.length, ...next)
 }
 
+let hydrateError: string | null = null
+export function getHydrateError(): string | null {
+  return hydrateError
+}
+
 export async function hydrateFromSupabase(): Promise<void> {
   if (IS_MOCK_MODE || !supabase) return
+  hydrateError = null
 
   try {
     const [
@@ -78,6 +84,30 @@ export async function hydrateFromSupabase(): Promise<void> {
       supabase.from('formation_programs').select('*').order('program_order'),
       supabase.from('formation_assignments').select('*'),
     ])
+
+    const responsesWithLabel: Array<[string, { error: { message: string } | null }]> = [
+      ['profiles', profilesRes],
+      ['member_instrument_skills', instSkillsRes],
+      ['member_dance_skills', danceSkillsRes],
+      ['announcements', annRes],
+      ['events', eventsRes],
+      ['event_responses', responsesRes],
+      ['practice_videos', videosRes],
+      ['registration_requests', regRes],
+      ['practice_sessions', sessionsRes],
+      ['practice_attendance', attendanceRes],
+      ['member_goals', goalsRes],
+      ['formations', formationsRes],
+      ['formation_programs', programsRes],
+      ['formation_assignments', assignmentsRes],
+    ]
+    const failed = responsesWithLabel
+      .filter(([, r]) => r.error)
+      .map(([label, r]) => `${label}: ${r.error!.message}`)
+    if (failed.length > 0) {
+      hydrateError = `一部テーブルの取得に失敗しました — ${failed.join(' / ')}`
+      console.error('[hydrate]', hydrateError)
+    }
 
     if (profilesRes.data) replace(MEMBERS, profilesRes.data as Profile[])
 
@@ -235,5 +265,6 @@ export async function hydrateFromSupabase(): Promise<void> {
     }
   } catch (err) {
     console.error('Supabase からのデータ取得に失敗しました:', err)
+    hydrateError = err instanceof Error ? err.message : String(err)
   }
 }

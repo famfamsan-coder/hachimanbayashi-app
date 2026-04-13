@@ -14,11 +14,34 @@ const ADMIN_MENU = [
 ]
 
 export default function ProfilePage() {
-  const { profile, isAdmin } = useAuth()
+  const { profile, isAdmin, loading, error } = useAuth()
   const pendingCount = getPendingRegistrationCount()
 
-  if (!profile) {
+  if (loading) {
     return <p className="text-center text-[var(--color-ink-muted)]">読み込み中...</p>
+  }
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+      >
+        <p className="mb-1 font-bold">プロフィールを読み込めませんでした</p>
+        <p className="break-words">{error}</p>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div
+        role="alert"
+        className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+      >
+        プロフィール情報が見つかりません。管理者に連絡するか、ログインし直してください。
+      </div>
+    )
   }
 
   return (
