@@ -79,17 +79,17 @@ export default function RegisterPage() {
       }
       MOCK_REGISTRATION_REQUESTS.unshift(newRequest)
     } else {
-      const { data, error } = await supabase
+      // anonロールは登録後の行をSELECTで読み返せない（管理者のみ閲覧ポリシー）ため、
+      // .select() を付けるとPostgRESTが「new row violates RLS」と誤認識する。
+      // 挿入成功の可否だけ確認すればよいので .select() は付けない。
+      const { error } = await supabase
         .from('registration_requests')
         .insert(payload)
-        .select()
-        .single()
       if (error) {
         setSubmitting(false)
         setErrors({ email: `送信に失敗しました: ${error.message}` })
         return
       }
-      if (data) MOCK_REGISTRATION_REQUESTS.unshift(data as RegistrationRequest)
     }
 
     setSubmitting(false)
